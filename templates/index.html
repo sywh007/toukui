@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>车辆检测监控系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 20px 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .header h1 {
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            color: #666;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .panel h2 {
+            margin-bottom: 15px;
+            color: #333;
+            border-left: 4px solid #667eea;
+            padding-left: 15px;
+        }
+
+        .video-list, .result-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .video-item, .result-item {
+            background: #f5f5f5;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 10px;
+            transition: transform 0.2s;
+        }
+
+        .video-item:hover, .result-item:hover {
+            transform: translateX(5px);
+            background: #e8e8e8;
+        }
+
+        .video-name, .result-name {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+            word-break: break-all;
+        }
+
+        .video-info, .result-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 5px 12px;
+            margin-top: 10px;
+            margin-right: 10px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+
+        .btn:hover {
+            background: #764ba2;
+        }
+
+        .btn-download {
+            background: #4caf50;
+        }
+
+        .btn-play {
+            background: #ff9800;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .refresh-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .refresh-btn:hover {
+            background: #764ba2;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .loading {
+            animation: pulse 1s infinite;
+        }
+
+        video {
+            max-width: 100%;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚗 车辆检测监控系统</h1>
+            <p>实时接收树莓派上传的MP4视频和检测结果</p>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="videoCount">0</div>
+                <div class="stat-label">视频文件</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="resultCount">0</div>
+                <div class="stat-label">检测结果</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalSize">0</div>
+                <div class="stat-label">总大小(MB)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="lastUpdate">-</div>
+                <div class="stat-label">最后更新</div>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="panel">
+                <h2>📹 视频列表</h2>
+                <button class="refresh-btn" onclick="loadData()">🔄 刷新</button>
+                <div id="videoList" class="video-list">
+                    <div class="empty">加载中...</div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>📊 检测结果</h2>
+                <div id="resultList" class="result-list">
+                    <div class="empty">加载中...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function loadData() {
+            fetch('/api/files')
+                .then(response => response.json())
+                .then(data => {
+                    // 更新统计
+                    document.getElementById('videoCount').innerText = data.total_videos;
+                    document.getElementById('resultCount').innerText = data.total_results;
+
+                    let totalSize = 0;
+                    data.videos.forEach(v => totalSize += v.size);
+                    data.results.forEach(r => totalSize += r.size);
+                    document.getElementById('totalSize').innerText = (totalSize / (1024*1024)).toFixed(1);
+                    document.getElementById('lastUpdate').innerText = new Date().toLocaleTimeString();
+
+                    // 显示视频列表
+                    const videoList = document.getElementById('videoList');
+                    if (data.videos.length === 0) {
+                        videoList.innerHTML = '<div class="empty">暂无视频</div>';
+                    } else {
+                        videoList.innerHTML = data.videos.map(v => `
+                            <div class="video-item">
+                                <div class="video-name">🎬 ${v.name}</div>
+                                <div class="video-info">
+                                    大小: ${formatFileSize(v.size)} | 时间: ${v.modified}
+                                </div>
+                                <a href="/play/${v.name}" class="btn btn-play" target="_blank">▶ 播放</a>
+                                <a href="/download/${v.name}" class="btn btn-download">⬇️ 下载</a>
+                            </div>
+                        `).join('');
+                    }
+
+                    // 显示结果列表
+                    const resultList = document.getElementById('resultList');
+                    if (data.results.length === 0) {
+                        resultList.innerHTML = '<div class="empty">暂无检测结果</div>';
+                    } else {
+                        resultList.innerHTML = data.results.map(r => `
+                            <div class="result-item">
+                                <div class="result-name">📄 ${r.name}</div>
+                                <div class="result-info">
+                                    大小: ${formatFileSize(r.size)} | 时间: ${r.modified}
+                                </div>
+                                <a href="/download/${r.name}" class="btn btn-download">⬇️ 下载JSON</a>
+                            </div>
+                        `).join('');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('videoList').innerHTML = '<div class="empty">加载失败</div>';
+                    document.getElementById('resultList').innerHTML = '<div class="empty">加载失败</div>';
+                });
+        }
+
+        // 自动刷新
+        loadData();
+        setInterval(loadData, 5000);
+    </script>
+</body>
+</html>

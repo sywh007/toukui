@@ -1,0 +1,137 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>服务器控制中心</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .card {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 0 10px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+            border: none;
+            cursor: pointer;
+        }
+        .btn:hover {
+            background-color: #45a049;
+        }
+        .btn.stop {
+            background-color: #f44336;
+        }
+        .btn.stop:hover {
+            background-color: #da190b;
+        }
+        .video-list {
+            margin-top: 20px;
+        }
+        .video-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .video-item:hover {
+            background-color: #f9f9f9;
+        }
+        .status {
+            padding: 10px;
+            background-color: #e8f5e8;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>服务器控制中心</h1>
+        
+        <div class="card">
+            <h2>控制命令</h2>
+            <div class="status">
+                <p>状态: <span id="status">就绪</span></p>
+            </div>
+            <button class="btn" onclick="sendCommand('start')">开始拍摄</button>
+            <button class="btn stop" onclick="sendCommand('stop')">停止拍摄</button>
+            <button class="btn" onclick="refreshVideos()">刷新视频列表</button>
+        </div>
+        
+        <div class="card">
+            <h2>已上传视频</h2>
+            <div class="video-list" id="videoList">
+                <!-- 视频列表将通过JavaScript动态添加 -->
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 发送命令到树莓派
+        function sendCommand(command) {
+            fetch('/command_raspberry', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({command: command})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('status').textContent = `命令已发送: ${command}`;
+                }
+            });
+        }
+        
+        // 刷新视频列表
+        function refreshVideos() {
+            fetch('/get_videos')
+                .then(response => response.json())
+                .then(data => {
+                    const videoList = document.getElementById('videoList');
+                    videoList.innerHTML = '';
+                    
+                    data.videos.forEach(video => {
+                        const item = document.createElement('div');
+                        item.className = 'video-item';
+                        item.innerHTML = `
+                            <strong>${video.filename}</strong><br>
+                            大小: ${(video.size / (1024 * 1024)).toFixed(2)} MB<br>
+                            上传时间: ${new Date(video.upload_time).toLocaleString()}
+                        `;
+                        videoList.appendChild(item);
+                    });
+                });
+        }
+        
+        // 页面加载时刷新视频列表
+        window.onload = function() {
+            refreshVideos();
+        };
+    </script>
+</body>
+</html>
+    
